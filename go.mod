@@ -1,4 +1,4 @@
-module github.com/rashaev/meeting_bot
+module meeting_bot
 
 go 1.14
 
