@@ -1,10 +1,12 @@
 package log
 
 import (
-	"github.com/sirupsen/logrus"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
+// InitLogger initialize logger
 func InitLogger(logfile, severity string) *logrus.Logger {
 	var log = logrus.New()
 	log.Formatter = new(logrus.TextFormatter)
