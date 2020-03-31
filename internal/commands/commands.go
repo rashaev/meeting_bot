@@ -7,18 +7,13 @@ import (
 	"time"
 )
 
-// Room represent room object
-//type Room int
-
 // Meeting represent the meeting object
 type Meeting struct {
-	ID          int
-	CreatedBy   string
-	Title       string
-	Description string
-	RoomID      int
-	StartDate   time.Time
-	Duration    time.Time
+	ID        int
+	CreatedBy string
+	RoomID    int
+	StartDate time.Time
+	Duration  time.Time
 }
 
 //AddRoom function adds new room
