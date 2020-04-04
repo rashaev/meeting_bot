@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"meeting_bot/internal/commands"
 	"meeting_bot/internal/config"
-	"meeting_bot/internal/log"
+	logger "meeting_bot/internal/log"
 	"net/http"
 	"strconv"
-	"time"
 
 	tgcalendar "github.com/dipsycat/calendar-telegram-go"
+	"github.com/go-redis/redis/v7"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	_ "github.com/jackc/pgx/v4/stdlib"
 )
@@ -25,76 +25,130 @@ func makeButtons(db *sql.DB) tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(keyboardRoom...)
 }
 
+func callbackHandlerSelectDate(rdb *redis.Client, bot *tgbotapi.BotAPI, update tgbotapi.Update) {
+	//dateParse, _ := time.Parse("2006.01.2 15:04", update.CallbackQuery.Data)
+	rdb.HSet(strconv.Itoa(update.CallbackQuery.From.ID), "date", update.CallbackQuery.Data)
+	msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Choose time:")
+	timeKeyboard := makeTimeKeyboard(update)
+	msg.ReplyMarkup = timeKeyboard
+	bot.Send(msg)
+}
+
+func callbackHandlerSelectDuration(rdb *redis.Client, bot *tgbotapi.BotAPI, update tgbotapi.Update, db *sql.DB) {
+	rdb.HSet(strconv.Itoa(update.CallbackQuery.From.ID), "duration", update.CallbackQuery.Data)
+	mapResult := rdb.HGetAll(strconv.Itoa(update.CallbackQuery.From.ID)).Val()
+	err := commands.AddMeeting(db, update, mapResult)
+	if err != nil {
+		msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, fmt.Sprint(err))
+		bot.Send(msg)
+	} else {
+		rdb.Del(strconv.Itoa(update.CallbackQuery.From.ID))
+		msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Meeting successfully added")
+		bot.Send(msg)
+	}
+}
+func callbackHandlerSelectRoom(rdb *redis.Client, bot *tgbotapi.BotAPI, update tgbotapi.Update) {
+	rdb.HSet(strconv.Itoa(update.CallbackQuery.From.ID), "room", update.CallbackQuery.Data)
+	msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Select date:")
+	genCalendar := tgcalendar.GenerateCalendar(2020, 4)
+	msg.ReplyMarkup = genCalendar
+	bot.Send(msg)
+}
+
+func callbackHandlerSelectTime(rdb *redis.Client, bot *tgbotapi.BotAPI, update tgbotapi.Update) {
+	var durationKeyboard = tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("30 minute", "30m"),
+			tgbotapi.NewInlineKeyboardButtonData("1 hour", "60m"),
+			tgbotapi.NewInlineKeyboardButtonData("2 hours", "120m"),
+			tgbotapi.NewInlineKeyboardButtonData("3 hours", "180m"),
+		),
+	)
+
+	rdb.HSet(strconv.Itoa(update.CallbackQuery.From.ID), "time", update.CallbackQuery.Data)
+	msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Choose duration:")
+	msg.ReplyMarkup = durationKeyboard
+	bot.Send(msg)
+}
+
 func makeTimeKeyboard(update tgbotapi.Update) tgbotapi.InlineKeyboardMarkup {
 	var timeKeyboard = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("00:00", update.CallbackQuery.Data+" "+"00:00"),
-			tgbotapi.NewInlineKeyboardButtonData("01:00", update.CallbackQuery.Data+" "+"01:00"),
-			tgbotapi.NewInlineKeyboardButtonData("02:00", update.CallbackQuery.Data+" "+"02:00"),
-			tgbotapi.NewInlineKeyboardButtonData("03:00", update.CallbackQuery.Data+" "+"03:00"),
-			tgbotapi.NewInlineKeyboardButtonData("04:00", update.CallbackQuery.Data+" "+"04:00"),
-			tgbotapi.NewInlineKeyboardButtonData("05:00", update.CallbackQuery.Data+" "+"05:00"),
+			tgbotapi.NewInlineKeyboardButtonData("00:00", "00:00"),
+			tgbotapi.NewInlineKeyboardButtonData("01:00", "01:00"),
+			tgbotapi.NewInlineKeyboardButtonData("02:00", "02:00"),
+			tgbotapi.NewInlineKeyboardButtonData("03:00", "03:00"),
+			tgbotapi.NewInlineKeyboardButtonData("04:00", "04:00"),
+			tgbotapi.NewInlineKeyboardButtonData("05:00", "05:00"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("06:00", update.CallbackQuery.Data+" "+"06:00"),
-			tgbotapi.NewInlineKeyboardButtonData("07:00", update.CallbackQuery.Data+" "+"07:00"),
-			tgbotapi.NewInlineKeyboardButtonData("08:00", update.CallbackQuery.Data+" "+"08:00"),
-			tgbotapi.NewInlineKeyboardButtonData("09:00", update.CallbackQuery.Data+" "+"09:00"),
-			tgbotapi.NewInlineKeyboardButtonData("10:00", update.CallbackQuery.Data+" "+"10:00"),
-			tgbotapi.NewInlineKeyboardButtonData("11:00", update.CallbackQuery.Data+" "+"11:00"),
+			tgbotapi.NewInlineKeyboardButtonData("06:00", "06:00"),
+			tgbotapi.NewInlineKeyboardButtonData("07:00", "07:00"),
+			tgbotapi.NewInlineKeyboardButtonData("08:00", "08:00"),
+			tgbotapi.NewInlineKeyboardButtonData("09:00", "09:00"),
+			tgbotapi.NewInlineKeyboardButtonData("10:00", "10:00"),
+			tgbotapi.NewInlineKeyboardButtonData("11:00", "11:00"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("12:00", update.CallbackQuery.Data+" "+"12:00"),
-			tgbotapi.NewInlineKeyboardButtonData("13:00", update.CallbackQuery.Data+" "+"13:00"),
-			tgbotapi.NewInlineKeyboardButtonData("14:00", update.CallbackQuery.Data+" "+"14:00"),
-			tgbotapi.NewInlineKeyboardButtonData("15:00", update.CallbackQuery.Data+" "+"15:00"),
-			tgbotapi.NewInlineKeyboardButtonData("16:00", update.CallbackQuery.Data+" "+"16:00"),
-			tgbotapi.NewInlineKeyboardButtonData("17:00", update.CallbackQuery.Data+" "+"17:00"),
+			tgbotapi.NewInlineKeyboardButtonData("12:00", "12:00"),
+			tgbotapi.NewInlineKeyboardButtonData("13:00", "13:00"),
+			tgbotapi.NewInlineKeyboardButtonData("14:00", "14:00"),
+			tgbotapi.NewInlineKeyboardButtonData("15:00", "15:00"),
+			tgbotapi.NewInlineKeyboardButtonData("16:00", "16:00"),
+			tgbotapi.NewInlineKeyboardButtonData("17:00", "17:00"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("18:00", update.CallbackQuery.Data+" "+"18:00"),
-			tgbotapi.NewInlineKeyboardButtonData("19:00", update.CallbackQuery.Data+" "+"19:00"),
-			tgbotapi.NewInlineKeyboardButtonData("20:00", update.CallbackQuery.Data+" "+"20:00"),
-			tgbotapi.NewInlineKeyboardButtonData("21:00", update.CallbackQuery.Data+" "+"21:00"),
-			tgbotapi.NewInlineKeyboardButtonData("22:00", update.CallbackQuery.Data+" "+"22:00"),
-			tgbotapi.NewInlineKeyboardButtonData("23:00", update.CallbackQuery.Data+" "+"23:00"),
+			tgbotapi.NewInlineKeyboardButtonData("18:00", "18:00"),
+			tgbotapi.NewInlineKeyboardButtonData("19:00", "19:00"),
+			tgbotapi.NewInlineKeyboardButtonData("20:00", "20:00"),
+			tgbotapi.NewInlineKeyboardButtonData("21:00", "21:00"),
+			tgbotapi.NewInlineKeyboardButtonData("22:00", "22:00"),
+			tgbotapi.NewInlineKeyboardButtonData("23:00", "23:00"),
 		),
 	)
 	return timeKeyboard
 }
 
 func main() {
-	log := log.InitLogger("meetingbot.log", "info")
+	logger := logger.InitLogger("meetingbot.logger", "info")
 	cfg, err := config.InitConfig()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 
 	dsn := fmt.Sprintf("user=%s dbname=%s password=%s port=%d sslmode=verify­full", cfg.Database.Username, cfg.Database.Name, cfg.Database.Password, cfg.Database.Port)
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		log.Fatal("failed to load driver")
+		logger.Fatal("failed to load driver")
 	}
 
 	if err := db.Ping(); err != nil {
-		log.Fatal("Error database connection")
+		logger.Fatal("Error database connection")
+	}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "127.0.0.1:6379",
+	})
+	_, err = rdb.Ping().Result()
+	if err != nil {
+		logger.Fatal(err)
 	}
 
 	bot, err := tgbotapi.NewBotAPI(cfg.Telegram.Token)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	} else {
-		log.Info("Authorized on account ", bot.Self.UserName)
+		logger.Info("Authorized on account ", bot.Self.UserName)
 	}
 
 	go http.ListenAndServeTLS(cfg.Network.Host+":"+cfg.Network.Port, cfg.CertFile, cfg.KeyFile, nil)
-	log.Info("Running service  ", cfg.Network.Host, ":", cfg.Network.Port)
+	logger.Info("Running service  ", cfg.Network.Host, ":", cfg.Network.Port)
 
 	_, err = bot.SetWebhook(tgbotapi.NewWebhookWithCert(cfg.Telegram.WebHookURL+bot.Token, cfg.CertFile))
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	} else {
-		log.Info("Webhook URL: ", cfg.Telegram.WebHookURL+bot.Token)
+		logger.Info("Webhook URL: ", cfg.Telegram.WebHookURL+bot.Token)
 	}
 
 	updates := bot.ListenForWebhook("/" + bot.Token)
@@ -119,10 +173,10 @@ func main() {
 							err := commands.AddRoom(db, roomInt)
 							if err == nil {
 								bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "New room was added: "))
-								log.Info("New room was added")
+								logger.Info("New room was added")
 							} else {
 								bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, "Error adding room"))
-								log.Error(err)
+								logger.Error(err)
 							}
 
 						}
@@ -137,12 +191,12 @@ func main() {
 						bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, resultRooms))
 					}()
 				case "addmeeting":
-					msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Select date:")
-					genCalendar := tgcalendar.GenerateCalendar(2020, 4)
-					msg.ReplyMarkup = genCalendar
-					bot.Send(msg)
-				default:
-					fmt.Println("command not found")
+					go func() {
+						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Select room:")
+						roomKeyBoard := makeButtons(db)
+						msg.ReplyMarkup = roomKeyBoard
+						bot.Send(msg)
+					}()
 				}
 			}
 		} else if update.CallbackQuery != nil {
@@ -151,19 +205,19 @@ func main() {
 				go func() {
 					deletedRows := commands.DelRoom(db, update.CallbackQuery.Data)
 					if deletedRows == 0 {
-						log.Warnf("Cannot delete %s from database", update.CallbackQuery.Data)
+						logger.Warnf("Cannot delete %s from database", update.CallbackQuery.Data)
 					} else if deletedRows == 1 {
 						bot.Send(tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, update.CallbackQuery.Data+" deleted"))
 					}
 				}()
 			case "Select date:":
-				msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Choose time:")
-				timeKeyboard := makeTimeKeyboard(update)
-				msg.ReplyMarkup = timeKeyboard
-				bot.Send(msg)
+				go callbackHandlerSelectDate(rdb, bot, update)
 			case "Choose time:":
-				dateTime, _ := time.Parse("2006.01.2 15:04", update.CallbackQuery.Data)
-				fmt.Println(dateTime)
+				go callbackHandlerSelectTime(rdb, bot, update)
+			case "Select room:":
+				go callbackHandlerSelectRoom(rdb, bot, update)
+			case "Choose duration:":
+				go callbackHandlerSelectDuration(rdb, bot, update, db)
 			}
 
 		}
