@@ -1,2 +1,2 @@
 CREATE TABLE room(id SERIAL, number SMALLINT NOT NULL, PRIMARY KEY(id));
-CREATE TABLE meeting(id SERIAL, created_by VARCHAR(20) NOT NULL, title VARCHAR(30) NOT NULL, description VARCHAR(100), room_id INT, start_date TIMESTAMP NOT NULL, duration INTERVAL, FOREIGN KEY (room_id) REFERENCES room (id));
+CREATE TABLE meeting(id SERIAL, created_by VARCHAR(20) NOT NULL, room INT, start_date TIMESTAMP NOT NULL, duration INTERVAL);
