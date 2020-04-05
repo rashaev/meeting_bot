@@ -130,7 +130,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("failed to load driver")
 	}
-	db.Close()
+	defer db.Close()
 
 	if err := db.Ping(); err != nil {
 		logger.Fatal("Error database connection")
