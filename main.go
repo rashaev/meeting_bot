@@ -143,6 +143,7 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
+	defer rdb.Close()
 
 	bot, err := tgbotapi.NewBotAPI(cfg.Telegram.Token)
 	if err != nil {
