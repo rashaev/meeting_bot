@@ -119,7 +119,7 @@ func makeTimeKeyboard(update tgbotapi.Update) tgbotapi.InlineKeyboardMarkup {
 }
 
 func main() {
-	logger := logger.InitLogger("meetingbot.logger", "info")
+	logger := logger.InitLogger("/var/log/meeting_bot/meeting_bot.log", "info")
 	cfg, err := config.InitConfig()
 	if err != nil {
 		logger.Fatal(err)
@@ -130,6 +130,7 @@ func main() {
 	if err != nil {
 		logger.Fatal("failed to load driver")
 	}
+	db.Close()
 
 	if err := db.Ping(); err != nil {
 		logger.Fatal("Error database connection")
