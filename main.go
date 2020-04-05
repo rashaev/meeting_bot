@@ -15,7 +15,7 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
-func makeButtons(db *sql.DB) tgbotapi.InlineKeyboardMarkup {
+func roomButtons(db *sql.DB) tgbotapi.InlineKeyboardMarkup {
 	var keyboardRoom [][]tgbotapi.InlineKeyboardButton
 	roomSlice, _ := commands.ListRooms(db)
 	for _, room := range roomSlice {
@@ -25,8 +25,17 @@ func makeButtons(db *sql.DB) tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(keyboardRoom...)
 }
 
+func meetingButtons(db *sql.DB, update tgbotapi.Update) tgbotapi.InlineKeyboardMarkup {
+	var keyboardMeeting [][]tgbotapi.InlineKeyboardButton
+	meetingSlc, _ := commands.GetMyMeetings(db, update)
+	for _, meeting := range meetingSlc {
+		keyButton := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(meeting.Room)+"\t\t\t"+meeting.StartDate.Format("2006-01-02 15:04:05")+"\t\t\t"+meeting.Duration, strconv.Itoa(meeting.Room)+";"+meeting.StartDate.Format("2006-01-02 15:04:05")+";"+meeting.Duration))
+		keyboardMeeting = append(keyboardMeeting, keyButton)
+	}
+	return tgbotapi.NewInlineKeyboardMarkup(keyboardMeeting...)
+}
+
 func callbackHandlerSelectDate(rdb *redis.Client, bot *tgbotapi.BotAPI, update tgbotapi.Update) {
-	//dateParse, _ := time.Parse("2006.01.2 15:04", update.CallbackQuery.Data)
 	rdb.HSet(strconv.Itoa(update.CallbackQuery.From.ID), "date", update.CallbackQuery.Data)
 	msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Choose time:")
 	timeKeyboard := makeTimeKeyboard(update)
@@ -160,7 +169,7 @@ func main() {
 				case "delroom":
 					go func() {
 						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Which room you want to delete?")
-						roomKeyBoard := makeButtons(db)
+						roomKeyBoard := roomButtons(db)
 						msg.ReplyMarkup = roomKeyBoard
 						bot.Send(msg)
 					}()
@@ -193,8 +202,28 @@ func main() {
 				case "addmeeting":
 					go func() {
 						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Select room:")
-						roomKeyBoard := makeButtons(db)
+						roomKeyBoard := roomButtons(db)
 						msg.ReplyMarkup = roomKeyBoard
+						bot.Send(msg)
+					}()
+				case "mymeetings":
+					go func() {
+						var resultMeetings string
+						meetingSlice, err := commands.GetMyMeetings(db, update)
+						if err != nil {
+							fmt.Println(err)
+						}
+
+						for _, meeting := range meetingSlice {
+							resultMeetings = resultMeetings + strconv.Itoa(meeting.Room) + "\t\t\t" + meeting.StartDate.Format("2006-01-02 15:04:05") + "\t\t\t" + meeting.Duration + "\n"
+						}
+						bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, resultMeetings))
+					}()
+				case "delmeeting":
+					go func() {
+						msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Which meeting you want to delete?")
+						meetingKeyBoard := meetingButtons(db, update)
+						msg.ReplyMarkup = meetingKeyBoard
 						bot.Send(msg)
 					}()
 				}
@@ -218,6 +247,15 @@ func main() {
 				go callbackHandlerSelectRoom(rdb, bot, update)
 			case "Choose duration:":
 				go callbackHandlerSelectDuration(rdb, bot, update, db)
+			case "Which meeting you want to delete?":
+				go func() {
+					deletedRows := commands.DelMeeting(db, update)
+					if deletedRows == 0 {
+						logger.Warnf("Cannot delete meeting from database")
+					} else if deletedRows == 1 {
+						bot.Send(tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Meeting successfully deleted"))
+					}
+				}()
 			}
 
 		}
