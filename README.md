@@ -1,6 +1,8 @@
 # meeting_bot
 Telegram  Bot
 
+This telegram bot allows you to book meeting rooms. To book, you need to specify the room, date, time and duration for which you want to book a room.
+
 # Supported  commands
 
 
