@@ -8,11 +8,17 @@ import (
 	logger "meeting_bot/internal/log"
 	"net/http"
 	"strconv"
+	"time"
 
 	tgcalendar "github.com/dipsycat/calendar-telegram-go"
 	"github.com/go-redis/redis/v7"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	_ "github.com/jackc/pgx/v4/stdlib"
+)
+
+var (
+	year  = time.Now().Year()
+	month = time.Now().Month()
 )
 
 func roomButtons(db *sql.DB) tgbotapi.InlineKeyboardMarkup {
@@ -36,11 +42,28 @@ func meetingButtons(db *sql.DB, update tgbotapi.Update) tgbotapi.InlineKeyboardM
 }
 
 func callbackHandlerSelectDate(rdb *redis.Client, bot *tgbotapi.BotAPI, update tgbotapi.Update) {
-	rdb.HSet(strconv.Itoa(update.CallbackQuery.From.ID), "date", update.CallbackQuery.Data)
-	msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Choose time:")
-	timeKeyboard := makeTimeKeyboard(update)
-	msg.ReplyMarkup = timeKeyboard
-	bot.Send(msg)
+	if update.CallbackQuery.Data == tgcalendar.BTN_NEXT {
+		nextCalendar, newYear, newMonth := tgcalendar.HandlerNextButton(year, month)
+		year = newYear
+		month = newMonth
+		msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Select date:")
+		msg.ReplyMarkup = nextCalendar
+		bot.Send(msg)
+	} else if update.CallbackQuery.Data == tgcalendar.BTN_PREV {
+		prevCalendar, newYear, newMonth := tgcalendar.HandlerPrevButton(year, month)
+		year = newYear
+		month = newMonth
+		msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Select date:")
+		msg.ReplyMarkup = prevCalendar
+		bot.Send(msg)
+	} else {
+		rdb.HSet(strconv.Itoa(update.CallbackQuery.From.ID), "date", update.CallbackQuery.Data)
+		msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Choose time:")
+		timeKeyboard := makeTimeKeyboard(update)
+		msg.ReplyMarkup = timeKeyboard
+		bot.Send(msg)
+	}
+
 }
 
 func callbackHandlerSelectDuration(rdb *redis.Client, bot *tgbotapi.BotAPI, update tgbotapi.Update, db *sql.DB) {
@@ -59,7 +82,7 @@ func callbackHandlerSelectDuration(rdb *redis.Client, bot *tgbotapi.BotAPI, upda
 func callbackHandlerSelectRoom(rdb *redis.Client, bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	rdb.HSet(strconv.Itoa(update.CallbackQuery.From.ID), "room", update.CallbackQuery.Data)
 	msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Select date:")
-	genCalendar := tgcalendar.GenerateCalendar(2020, 4)
+	genCalendar := tgcalendar.GenerateCalendar(time.Now().Year(), time.Now().Month())
 	msg.ReplyMarkup = genCalendar
 	bot.Send(msg)
 }
