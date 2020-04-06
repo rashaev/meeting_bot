@@ -16,11 +16,6 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 )
 
-var (
-	year  = time.Now().Year()
-	month = time.Now().Month()
-)
-
 func roomButtons(db *sql.DB) tgbotapi.InlineKeyboardMarkup {
 	var keyboardRoom [][]tgbotapi.InlineKeyboardButton
 	roomSlice, _ := commands.ListRooms(db)
@@ -43,16 +38,12 @@ func meetingButtons(db *sql.DB, update tgbotapi.Update) tgbotapi.InlineKeyboardM
 
 func callbackHandlerSelectDate(rdb *redis.Client, bot *tgbotapi.BotAPI, update tgbotapi.Update) {
 	if update.CallbackQuery.Data == tgcalendar.BTN_NEXT {
-		nextCalendar, newYear, newMonth := tgcalendar.HandlerNextButton(year, month)
-		year = newYear
-		month = newMonth
+		nextCalendar, _, _ := tgcalendar.HandlerNextButton(time.Now().Year(), time.Now().Month())
 		msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Select date:")
 		msg.ReplyMarkup = nextCalendar
 		bot.Send(msg)
 	} else if update.CallbackQuery.Data == tgcalendar.BTN_PREV {
-		prevCalendar, newYear, newMonth := tgcalendar.HandlerPrevButton(year, month)
-		year = newYear
-		month = newMonth
+		prevCalendar, _, _ := tgcalendar.HandlerPrevButton(time.Now().Year(), time.Now().Month())
 		msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Select date:")
 		msg.ReplyMarkup = prevCalendar
 		bot.Send(msg)
