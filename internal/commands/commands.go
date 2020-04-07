@@ -13,8 +13,7 @@ import (
 
 // Meeting represent the meeting object
 type Meeting struct {
-	ID        int
-	CreatedBy string
+	CreatedBy int
 	Room      int
 	StartDate time.Time
 	Duration  string
@@ -65,14 +64,14 @@ func ListRooms(db *sql.DB) ([]int, error) {
 func GetMyMeetings(db *sql.DB, update tgbotapi.Update) ([]Meeting, error) {
 	var myMeeting Meeting
 	var result []Meeting
-	rows, err := db.Query("SELECT * FROM meeting WHERE created_by = $1 AND start_date >= $2", update.Message.From.UserName, time.Now().Format("2006-01-02 15:04:05"))
+	rows, err := db.Query("SELECT * FROM meeting WHERE created_by = $1 AND start_date >= $2 ORDER BY start_date", update.Message.From.ID, time.Now().Format("2006-01-02 15:04:05"))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		if err := rows.Scan(&myMeeting.ID, &myMeeting.CreatedBy, &myMeeting.Room, &myMeeting.StartDate, &myMeeting.Duration); err != nil {
+		if err := rows.Scan(&myMeeting.CreatedBy, &myMeeting.Room, &myMeeting.StartDate, &myMeeting.Duration); err != nil {
 			return nil, err
 		}
 		result = append(result, myMeeting)
@@ -111,7 +110,7 @@ func AddMeeting(db *sql.DB, update tgbotapi.Update, mapResult map[string]string)
 	row := db.QueryRow("SELECT room, start_date, start_date + duration as end_date FROM meeting WHERE room = $1 AND start_date < $2 AND start_date + duration > $3", roomParse, startDateParse.Add(durationMinutes), startDateParse)
 	err := row.Scan(&roomNumber, &startDatetime, &endDatetime)
 	if err == sql.ErrNoRows {
-		_, err = db.Exec("INSERT INTO meeting(created_by, room, start_date, duration) VALUES ($1, $2, $3, $4)", update.CallbackQuery.From.UserName, roomParse, startDateParse, durationParse)
+		_, err = db.Exec("INSERT INTO meeting(created_by, room, start_date, duration) VALUES ($1, $2, $3, $4)", update.CallbackQuery.From.ID, roomParse, startDateParse, durationParse)
 		if err != nil {
 			return err
 		}
