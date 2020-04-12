@@ -225,14 +225,14 @@ func main() {
 					}()
 				case "mymeetings":
 					go func() {
-						var resultMeetings string
+						resultMeetings := "---------------------------------------------\n" + fmt.Sprintf("  %-5s   %-27s   %-10s \n", "ROOM", "DATETIME", "DURATION") + "---------------------------------------------\n"
 						meetingSlice, err := commands.GetMyMeetings(db, update)
 						if err != nil {
 							fmt.Println(err)
 						}
 
 						for _, meeting := range meetingSlice {
-							resultMeetings = resultMeetings + strconv.Itoa(meeting.Room) + "\t\t\t" + meeting.StartDate.Format("2006-01-02 15:04:05") + "\t\t\t" + meeting.Duration + "\n"
+							resultMeetings = resultMeetings + fmt.Sprintf("  %-10s  %-23s %-10s\n", strconv.Itoa(meeting.Room), meeting.StartDate.Format("2006-01-02 15:04:05"), meeting.Duration) + "---------------------------------------------\n"
 						}
 						bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, resultMeetings))
 					}()
