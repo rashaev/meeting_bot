@@ -21,6 +21,10 @@ type Config struct {
 		Token      string `json:"token"`
 		WebHookURL string `json:"webHookUrl"`
 	} `json:"telegram"`
+	Redis struct {
+		Host string `json:"host"`
+		Port string `json:"port"`
+	} `json:"redis"`
 	CertFile string `json:"certFile"`
 	KeyFile  string `json:"keyFile"`
 }

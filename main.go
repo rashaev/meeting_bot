@@ -65,7 +65,6 @@ func callbackHandlerSelectDuration(rdb *redis.Client, bot *tgbotapi.BotAPI, upda
 		msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, fmt.Sprint(err))
 		bot.Send(msg)
 	} else {
-		//rdb.Del(strconv.Itoa(update.CallbackQuery.From.ID))
 		rdb.Expire(strconv.Itoa(update.CallbackQuery.From.ID), 1*time.Hour)
 		msg := tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID, "Meeting successfully added")
 		bot.Send(msg)
@@ -152,7 +151,7 @@ func main() {
 	}
 
 	rdb := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
+		Addr: cfg.Redis.Host + ":" + cfg.Redis.Port,
 	})
 	_, err = rdb.Ping().Result()
 	if err != nil {
